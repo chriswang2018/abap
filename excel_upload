@@ -1,0 +1,215 @@
+REPORT Z71FEINVM001.
+tables: z71f_eivt001.
+
+data: gt_table type z71f_eivt001 occurs 0 with header line.
+
+data: gt_excel type ALSMEX_TABLINE occurs 0 with header line.
+data: gs_excel type alsmex_tabline.
+
+parameters: p_r1 radiobutton group g1,
+            p_r2 radiobutton group g1.
+
+data: begin of gs_data,
+        kunnr type z71f_eivt001-kunnr,
+        stceg type z71f_eivt001-stceg,
+        datvf type z71f_eivt001-datvf,
+        einv_type type z71f_eivt001-einv_type,
+        butxt type z71f_eivt001-butxt,
+      end of gs_data.
+*data: gs_data type z71f_eivt001.
+data: gt_data like gs_data occurs 0 with header line.
+
+parameters: p_file LIKE rlgrap-filename DEFAULT 'C:'.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR P_FILE.
+  PERFORM GET_FILE USING P_FILE.
+
+
+start-of-selection.
+
+
+if p_r1 = 'X'.
+
+  CALL FUNCTION 'VIEW_MAINTENANCE_CALL'
+    EXPORTING
+      ACTION                               = 'U'
+*     CORR_NUMBER                          = '          '
+*     GENERATE_MAINT_TOOL_IF_MISSING       = ' '
+*     SHOW_SELECTION_POPUP                 = ' '
+      VIEW_NAME                            = 'Z71F_EIVT001'
+*     NO_WARNING_FOR_CLIENTINDEP           = ' '
+*     RFC_DESTINATION_FOR_UPGRADE          = ' '
+*     CLIENT_FOR_UPGRADE                   = ' '
+*     VARIANT_FOR_SELECTION                = ' '
+*     COMPLEX_SELCONDS_USED                = ' '
+*     CHECK_DDIC_MAINFLAG                  = ' '
+*     SUPPRESS_WA_POPUP                    = ' '
+*   TABLES
+*     DBA_SELLIST                          =
+*     EXCL_CUA_FUNCT                       =
+*   EXCEPTIONS
+*     CLIENT_REFERENCE                     = 1
+*     FOREIGN_LOCK                         = 2
+*     INVALID_ACTION                       = 3
+*     NO_CLIENTINDEPENDENT_AUTH            = 4
+*     NO_DATABASE_FUNCTION                 = 5
+*     NO_EDITOR_FUNCTION                   = 6
+*     NO_SHOW_AUTH                         = 7
+*     NO_TVDIR_ENTRY                       = 8
+*     NO_UPD_AUTH                          = 9
+*     ONLY_SHOW_ALLOWED                    = 10
+*     SYSTEM_FAILURE                       = 11
+*     UNKNOWN_FIELD_IN_DBA_SELLIST         = 12
+*     VIEW_NOT_FOUND                       = 13
+*     MAINTENANCE_PROHIBITED               = 14
+*     OTHERS                               = 15
+            .
+  IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+else.
+
+  perform get_excel_file.
+
+  perform save_data.
+
+
+endif.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DIR
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_P_DIR  text
+*----------------------------------------------------------------------*
+FORM GET_FILE  USING    PP_DIR.
+  DATA LS TYPE STRING.
+  data: l_rc type i.
+  data: lt_ftable type FILETABLE.
+  data: ls_ftable type line of filetable.
+
+  CALL METHOD CL_GUI_FRONTEND_SERVICES=>FILE_OPEN_DIALOG
+     EXPORTING
+*      WINDOW_TITLE            =
+*      DEFAULT_EXTENSION       =
+        DEFAULT_FILENAME        = ls
+*      FILE_FILTER             =
+*      WITH_ENCODING           =
+*      INITIAL_DIRECTORY       =
+*      MULTISELECTION          =
+    CHANGING
+      FILE_TABLE              = lt_ftable
+      RC                      = l_rc
+*      USER_ACTION             =
+*      FILE_ENCODING           =
+*    EXCEPTIONS
+*      FILE_OPEN_DIALOG_FAILED = 1
+*      CNTL_ERROR              = 2
+*      ERROR_NO_GUI            = 3
+*      NOT_SUPPORTED_BY_GUI    = 4
+*      others                  = 5
+          .
+  IF SY-SUBRC <> 0.
+*   Implement suitable error handling here
+  ENDIF.
+
+  read table lt_ftable index 1 into ls_ftable.
+  if sy-subrc = 0.
+     pp_dir = ls_ftable-filename.
+  endif.
+
+
+ENDFORM.                    " GET_DIR
+*&---------------------------------------------------------------------*
+*&      Form  GET_EXCEL_FILE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM GET_EXCEL_FILE .
+  data:
+     L_START_COL TYPE I VALUE '1',
+     L_START_ROW TYPE I VALUE '1',
+     L_END_COL TYPE I VALUE '256',
+     L_END_ROW TYPE I VALUE '65536',
+     F_ROW TYPE I VALUE '0001',
+     l_index type  i.
+  field-symbols <fs>.
+
+
+  CALL FUNCTION 'ALSM_EXCEL_TO_INTERNAL_TABLE'
+    EXPORTING
+      FILENAME                      = p_file
+      I_BEGIN_COL                   = l_start_col
+      I_BEGIN_ROW                   = l_start_row
+      I_END_COL                     = l_end_col
+      I_END_ROW                     = l_end_row
+    TABLES
+      INTERN                        = gt_excel
+*   EXCEPTIONS
+*     INCONSISTENT_PARAMETERS       = 1
+*     UPLOAD_OLE                    = 2
+*     OTHERS                        = 3
+            .
+  IF SY-SUBRC <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  IF gt_excel[] IS INITIAL.
+
+     MESSAGE I398(00) with 'NO data'.
+
+  ELSE.
+
+  SORT gt_excel BY ROW COL. " "#EC ..
+
+  LOOP AT gt_excel INTO gs_excel.
+
+    IF gs_excel-ROW <> F_ROW . "AND gs_excel-ROW <> '0002'AND gs_excel-ROW <>'0003' and gs_excel-ROW <>'0004'.
+
+    "'0001'.
+
+      MOVE gs_excel-COL TO L_INDEX.
+
+      ASSIGN COMPONENT L_INDEX OF STRUCTURE gs_data TO <FS> .
+
+      IF SY-SUBRC = 0.
+
+         MOVE gs_excel-VALUE TO <FS>.
+
+      ENDIF.
+
+      AT END OF ROW . "#EC *
+
+          APPEND gs_data TO gt_data. "
+
+          CLEAR gs_data.
+
+      ENDAT.
+
+    ENDIF .
+
+  ENDLOOP.
+
+  endif.
+
+
+ENDFORM.                    " GET_EXCEL_FILE
+*&---------------------------------------------------------------------*
+*&      Form  SAVE_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM SAVE_DATA .
+  loop at gt_data into gs_data.
+     move-corresponding gs_data to z71f_eivt001.
+     modify z71f_eivt001.
+  endloop.
+  message s000(z71f_einv) with 'Save success!'.
+ENDFORM.                    " SAVE_DATA
