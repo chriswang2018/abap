@@ -1,0 +1,60 @@
+*&---------------------------------------------------------------------*
+*& Report ZTEST_CHRIS
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT ztest_chris.
+tables: bseg.
+
+DATA: l_setid      LIKE sethier-setid,
+      l_setinfo    type setinfo,
+      l_int_values TYPE STANDARD TABLE OF rgsbv.
+
+CALL FUNCTION 'G_SET_GET_ID_FROM_NAME'
+  EXPORTING
+    shortname     = 'ZFI_BANK_IN_ACCT '       "Set Name
+  IMPORTING
+    new_setid     = l_setid
+    set_info      = l_setinfo
+  EXCEPTIONS
+    OTHERS    = 1.
+
+if sy-subrc = 0.
+  CALL FUNCTION 'G_SET_FETCH'
+    EXPORTING
+      setnr              = l_setid
+    TABLES
+      set_lines_basic    = l_int_values
+    EXCEPTIONS
+      OTHERS             = 1.
+  if sy-subrc = 0.
+     data(lv_field) = |{ l_setinfo-tabname }-{ l_setinfo-fld }|.
+     ranges lr for lv_field.
+
+     loop at l_int_values assigning field-symbol(<fs_v>).
+       if <fs_v>-from is not initial and <fs_v>-to is initial.
+          lr-sign = 'I'.
+          lr-option = 'EQ'.
+          lr-low = <fs_v>-from.
+          append lr.
+       elseif <fs_v>-from is not initial and <fs_v>-to is not initial.
+          lr-sign = 'I'.
+          lr-option = 'BT'.
+          lr-low = <fs_v>-from.
+          lr-high = <fs_v>-to.
+          append lr.
+       endif.
+     endloop.
+  endif.
+endif.
+
+loop at lr.
+  write:/ lr-sign, lr-option, lr-low, lr-high.
+  bseg-hkont = lr-low.
+endloop.
+
+assign (lv_field) to field-symbol(<fs>).
+
+if <fs> in lr.
+   write:/ 'ok'.
+endif.
